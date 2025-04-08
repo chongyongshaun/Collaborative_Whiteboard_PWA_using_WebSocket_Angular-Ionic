@@ -1,0 +1,16 @@
+<ion-header [translucent]="true">
+  <ion-toolbar>
+    <ion-title>Whiteboard App | <span style="font-size: small;">Session ID: {{sessionId}}</span></ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content [fullscreen]="true">
+  <ion-header collapse="condense">
+    <ion-toolbar>
+      <ion-title size="large">Whiteboard</ion-title>
+    </ion-toolbar>
+  </ion-header>
+  <canvas #canvas (mousedown)="onMouseDown($event)" (mouseup)="onMouseUp()" (mousemove)="onMouseMove($event)"
+    (mouseleave)="onMouseUp()" (touchstart)="onTouchStart($event)" (touchmove)="onTouchMove($event)"
+    (touchend)="onTouchEnd()" style="border: 10px solid black;"></canvas>
+</ion-content>

@@ -1,0 +1,38 @@
+version: '3.8'
+services:
+  frontend:
+    build:
+      context: . # Root directory
+      dockerfile: frontend/Dockerfile
+    ports:
+      - "80:80"
+  redis:
+    image: redis:latest
+    ports:
+      - "6379:6379"
+    # depends_on:
+    #   - backend
+    #   - redis
+
+    # backend:
+    #   build: ./backend
+    #   ports:
+    #     - "3000:3000"
+    #   environment:
+    #     - REDIS_URL=redis://redis:6379
+    #   depends_on:
+    #     - redis
+
+    # app:
+    #   image: your-image-name
+    #   build:
+    #     context: .
+    #     dockerfile: Dockerfile
+    #   ports:
+    #     - "8080:80"
+    #   volumes:
+    #     - ./app:/app
+    #   environment:
+    #     - ENV_VAR_NAME=value
+    #   networks:
+    #     - app-network
