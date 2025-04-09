@@ -22,10 +22,10 @@ io.on('connection', (socket) => {
     socket.on('disconnect', () => {
         console.log('user disconnected', socket.id);
     });
-    socket.on("draw", (data) => {
-        console.log("Received batch of", data.length, "actions from", socket.id);
-        socket.broadcast.emit("draw", data);
-    })
+    socket.on('draw', (data) => {
+        console.log("Received canvas update from", data.sender);
+        socket.broadcast.emit('draw', data);
+    });
     socket.on("chat message", (data) => {
         console.log("received chat message event, sending to all clients", data);
         socket.broadcast.emit("chat message", data);

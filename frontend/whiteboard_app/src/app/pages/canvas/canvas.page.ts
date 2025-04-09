@@ -1,7 +1,7 @@
 import { AfterViewInit, Component, ElementRef, OnDestroy, OnInit, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { IonContent, IonHeader, IonTitle, IonToolbar, IonButton } from '@ionic/angular/standalone';
+import { IonContent, IonHeader, IonTitle, IonToolbar, IonButton, IonButtons, IonLabel, IonItem } from '@ionic/angular/standalone';
 import { DrawingService } from 'src/app/services/drawing.service';
 import { DrawingAction } from 'src/app/types/DrawingAction';
 import { Subscription } from 'rxjs';
@@ -11,7 +11,7 @@ import { Subscription } from 'rxjs';
   templateUrl: './canvas.page.html',
   styleUrls: ['./canvas.page.scss'],
   standalone: true,
-  imports: [IonContent, IonHeader, IonTitle, IonToolbar, CommonModule, FormsModule, IonButton]
+  imports: [IonContent, IonHeader, IonTitle, IonToolbar, CommonModule, FormsModule, IonButton, IonButtons, IonLabel, IonItem]
 })
 export class CanvasPage implements AfterViewInit, OnInit, OnDestroy { //cant use oninit, i need the canvas to be rendered first, dk why exactly, i have no idea what im doing
   @ViewChild('canvas', { static: false }) canvasRef!: ElementRef<HTMLCanvasElement>; //static to true so i can get the el before view is init, basically b4 afterviewinit
@@ -19,15 +19,20 @@ export class CanvasPage implements AfterViewInit, OnInit, OnDestroy { //cant use
   private isDrawing = false;
   private posX = 0;
   private posY = 0;
+  currentColor = 'black';
+  currentLineWidth = 2;
   sessionId = ""
+
+  undoStack: ImageData[] = [];
+  redoStack: ImageData[] = [];
+  private initialCanvasState: ImageData | null = null;
+  private MAX_HISTORY = 10;
 
   private drawingServiceSubscription!: Subscription; //the ! means that this variable will be initialized later, to keep angular compiler happy 
   constructor(private drawingService: DrawingService) { }
 
   ngOnInit(): void {
     this.drawingServiceSubscription = this.drawingService.newDrawingEvent.subscribe((data: DrawingAction) => {
-      // console.log("Received drawing action from", data.sender);
-
       if (data.sender !== this.sessionId) { //if the sender is not me, draw the line on the canvas
         console.log('Drawing line:', data); // Debug log
         this.drawRemote(data);
@@ -50,9 +55,10 @@ export class CanvasPage implements AfterViewInit, OnInit, OnDestroy { //cant use
       this.ctx = canvas.getContext('2d')!;
       this.ctx.scale(window.devicePixelRatio, window.devicePixelRatio); //scale the canvas to match the device pixel ratio
 
-      this.ctx.strokeStyle = 'black';
-      this.ctx.lineWidth = 2;
+      this.ctx.strokeStyle = this.currentColor
+      this.ctx.lineWidth = this.currentLineWidth
       this.sessionId = this.drawingService.getSocketId();
+      this.initialCanvasState = this.ctx.getImageData(0, 0, canvas.width, canvas.height)
     }, 50);
   }
   ngOnDestroy(): void {
@@ -61,6 +67,7 @@ export class CanvasPage implements AfterViewInit, OnInit, OnDestroy { //cant use
 
   onMouseDown(e: MouseEvent) {
     console.log('Mouse Down:', e.offsetX, e.offsetY); //debug
+    this.saveState();
     this.posX = e.offsetX;
     this.posY = e.offsetY;
     this.isDrawing = true;
@@ -70,23 +77,16 @@ export class CanvasPage implements AfterViewInit, OnInit, OnDestroy { //cant use
   }
   onMouseMove(e: MouseEvent) {
     if (this.isDrawing) {
-      this.drawLine(this.posX, this.posY, e.offsetX, e.offsetY, this.ctx.strokeStyle as string, this.ctx.lineWidth);
-
-      const canvas = this.canvasRef.nativeElement;
-      const rect = canvas.getBoundingClientRect();
-      const currClientDrawingAction: DrawingAction = {
-        sender: this.sessionId,
-        x1: this.posX,
-        y1: this.posY,
-        x2: e.offsetX,
-        y2: e.offsetY,
-        color: this.ctx.strokeStyle as string,
-        lineWidth: this.ctx.lineWidth
-      };
-      this.drawingService.sendDrawingAction(currClientDrawingAction);
+      this.drawLine(this.posX, this.posY, e.offsetX, e.offsetY, this.currentColor, this.currentLineWidth);
+      const imageData = this.ctx.getImageData(0, 0,
+        this.canvasRef.nativeElement.width,
+        this.canvasRef.nativeElement.height
+      );
+      this.drawingService.sendDrawingAction(imageData, this.currentColor, this.currentLineWidth);
     }
   }
   onTouchStart(e: TouchEvent) {
+    this.saveState();
     const rect = this.canvasRef.nativeElement.getBoundingClientRect();
     this.posX = e.touches[0].clientX - rect.left;
     this.posY = e.touches[0].clientY - rect.top;
@@ -98,17 +98,13 @@ export class CanvasPage implements AfterViewInit, OnInit, OnDestroy { //cant use
     const rect = this.canvasRef.nativeElement.getBoundingClientRect();
     const touchOffsetX = e.touches[0].clientX - rect.left;
     const touchOffsetY = e.touches[0].clientY - rect.top;
-    this.drawLine(this.posX, this.posY, touchOffsetX, touchOffsetY, this.ctx.strokeStyle as string, this.ctx.lineWidth);
-    const currClientDrawingAction: DrawingAction = {
-      sender: this.sessionId,
-      x1: this.posX,
-      y1: this.posY,
-      x2: touchOffsetX,
-      y2: touchOffsetY,
-      color: this.ctx.strokeStyle as string,
-      lineWidth: this.ctx.lineWidth
-    };
-    this.drawingService.sendDrawingAction(currClientDrawingAction);
+    this.drawLine(this.posX, this.posY, touchOffsetX, touchOffsetY, this.currentColor, this.currentLineWidth);
+
+    const imageData = this.ctx.getImageData(0, 0,
+      this.canvasRef.nativeElement.width,
+      this.canvasRef.nativeElement.height
+    );
+    this.drawingService.sendDrawingAction(imageData, this.currentColor, this.currentLineWidth);
   }
   onTouchEnd() {
     this.isDrawing = false;
@@ -124,22 +120,59 @@ export class CanvasPage implements AfterViewInit, OnInit, OnDestroy { //cant use
     this.ctx.closePath();
     this.posX = finalPosX;
     this.posY = finalPosY;
-    console.log('Drawing line:', initialPosX, initialPosY, finalPosX, finalPosY); // Debug log
+    // console.log('Drawing line:', initialPosX, initialPosY, finalPosX, finalPosY); // Debug log
   }
 
   private drawRemote(action: DrawingAction) {
-    const canvas = this.canvasRef.nativeElement;
-    const rect = canvas.getBoundingClientRect();
-
-    this.ctx.beginPath();
-    this.ctx.moveTo(action.x1 - 1, action.y1 - 1);
-    this.ctx.lineTo(action.x2, action.y2);
-    this.ctx.strokeStyle = action.color;
-    this.ctx.lineWidth = action.lineWidth;
-    this.ctx.stroke();
-    this.ctx.closePath();
-
-    console.log("drawing remote being called!!!")
+    const img = new Image();
+    img.onload = () => {
+      const canvas = this.canvasRef.nativeElement;
+      this.ctx.clearRect(0, 0, canvas.width, canvas.height);
+      this.ctx.strokeStyle = action.color;
+      this.ctx.lineWidth = action.lineWidth;
+      this.ctx.drawImage(img, 0, 0, action.width, action.height);
+    };
+    img.src = action.dataUrl;
   }
+
+  updateDrawingStyle() {
+    this.ctx.strokeStyle = this.currentColor; //two way binding with the color picker
+    this.ctx.lineWidth = this.currentLineWidth; //same for line width
+  }
+
+  private saveState() {
+    if (this.undoStack.length >= this.MAX_HISTORY) {
+      this.undoStack.shift(); //docs: Removes the first element from an array and returns it. If the array is empty, undefined is returned and the array is not modified.
+    }
+    const canvas = this.canvasRef.nativeElement;
+    this.undoStack.push(this.ctx.getImageData(0, 0, canvas.width, canvas.height));
+    this.redoStack = []; // Clear redo stack on new action
+  }
+
+  undo() {
+    if (this.undoStack.length > 0) {
+      const canvas = this.canvasRef.nativeElement;
+      const state = this.undoStack.pop()!;
+      this.redoStack.push(this.ctx.getImageData(0, 0, canvas.width, canvas.height));
+      this.ctx.putImageData(state, 0, 0);
+    }
+  }
+
+  redo() {
+    if (this.redoStack.length > 0) {
+      const canvas = this.canvasRef.nativeElement;
+      const state = this.redoStack.pop()!;
+      this.undoStack.push(this.ctx.getImageData(0, 0, canvas.width, canvas.height));
+      this.ctx.putImageData(state, 0, 0);
+    }
+  }
+  clearCanvas() {
+    if (this.initialCanvasState) {
+      this.ctx.putImageData(this.initialCanvasState, 0, 0);
+      this.undoStack = [];
+      this.redoStack = [];
+    }
+  }
+
 
 }

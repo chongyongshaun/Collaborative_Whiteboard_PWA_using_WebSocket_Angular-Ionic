@@ -1,9 +1,8 @@
 export interface DrawingAction {
     sender: string;
-    x1: number;
-    y1: number;
-    x2: number;
-    y2: number;
+    dataUrl: string;  // Base64 encoded image data
+    width: number;
+    height: number;
     color: string;
     lineWidth: number;
 }
