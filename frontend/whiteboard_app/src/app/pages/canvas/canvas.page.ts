@@ -22,17 +22,13 @@ export class CanvasPage implements AfterViewInit, OnInit, OnDestroy { //cant use
   currentColor = 'black';
   currentLineWidth = 2;
   sessionId = ""
-
-  undoStack: ImageData[] = [];
-  redoStack: ImageData[] = [];
   private initialCanvasState: ImageData | null = null;
-  private MAX_HISTORY = 10;
 
   private drawingServiceSubscription!: Subscription; //the ! means that this variable will be initialized later, to keep angular compiler happy 
   constructor(private drawingService: DrawingService) { }
 
   ngOnInit(): void {
-    this.drawingServiceSubscription = this.drawingService.newDrawingEvent.subscribe((data: DrawingAction) => {
+    this.drawingServiceSubscription = this.drawingService.newDrawingEvent.subscribe((data: DrawingAction) => { //received from the subject in drawing service
       if (data.sender !== this.sessionId) { //if the sender is not me, draw the line on the canvas
         console.log('Drawing line:', data); // Debug log
         this.drawRemote(data);
@@ -67,7 +63,6 @@ export class CanvasPage implements AfterViewInit, OnInit, OnDestroy { //cant use
 
   onMouseDown(e: MouseEvent) {
     console.log('Mouse Down:', e.offsetX, e.offsetY); //debug
-    this.saveState();
     this.posX = e.offsetX;
     this.posY = e.offsetY;
     this.isDrawing = true;
@@ -86,7 +81,6 @@ export class CanvasPage implements AfterViewInit, OnInit, OnDestroy { //cant use
     }
   }
   onTouchStart(e: TouchEvent) {
-    this.saveState();
     const rect = this.canvasRef.nativeElement.getBoundingClientRect();
     this.posX = e.touches[0].clientX - rect.left;
     this.posY = e.touches[0].clientY - rect.top;
@@ -140,38 +134,15 @@ export class CanvasPage implements AfterViewInit, OnInit, OnDestroy { //cant use
     this.ctx.lineWidth = this.currentLineWidth; //same for line width
   }
 
-  private saveState() {
-    if (this.undoStack.length >= this.MAX_HISTORY) {
-      this.undoStack.shift(); //docs: Removes the first element from an array and returns it. If the array is empty, undefined is returned and the array is not modified.
-    }
-    const canvas = this.canvasRef.nativeElement;
-    this.undoStack.push(this.ctx.getImageData(0, 0, canvas.width, canvas.height));
-    this.redoStack = []; // Clear redo stack on new action
-  }
-
   undo() {
-    if (this.undoStack.length > 0) {
-      const canvas = this.canvasRef.nativeElement;
-      const state = this.undoStack.pop()!;
-      this.redoStack.push(this.ctx.getImageData(0, 0, canvas.width, canvas.height));
-      this.ctx.putImageData(state, 0, 0);
-    }
+    this.drawingService.sendUndoRequest()
   }
 
   redo() {
-    if (this.redoStack.length > 0) {
-      const canvas = this.canvasRef.nativeElement;
-      const state = this.redoStack.pop()!;
-      this.undoStack.push(this.ctx.getImageData(0, 0, canvas.width, canvas.height));
-      this.ctx.putImageData(state, 0, 0);
-    }
+    this.drawingService.sendRedoRequest()
   }
   clearCanvas() {
-    if (this.initialCanvasState) {
-      this.ctx.putImageData(this.initialCanvasState, 0, 0);
-      this.undoStack = [];
-      this.redoStack = [];
-    }
+    this.drawingService.sendClearCanvasRequest();
   }
 
 

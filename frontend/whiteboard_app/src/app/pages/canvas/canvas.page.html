@@ -2,8 +2,8 @@
   <ion-toolbar>
     <ion-title>Whiteboard App | <span style="font-size: small;">Session ID: {{sessionId}}</span></ion-title>
     <ion-buttons slot="start">
-      <ion-button (click)="undo()" [disabled]="undoStack.length === 0">Undo</ion-button>
-      <ion-button (click)="redo()" [disabled]="redoStack.length === 0">Redo</ion-button>
+      <ion-button (click)="undo()">Undo</ion-button>
+      <ion-button (click)="redo()">Redo</ion-button>
       <ion-button (click)="clearCanvas()">Clear</ion-button>
     </ion-buttons>
     <ion-buttons slot="end">
