@@ -8,7 +8,8 @@ import { debounceTime, Subject } from 'rxjs';
   providedIn: 'root'
 })
 export class DrawingService {
-  private socket = io("http://localhost:3000/");
+  // private socket = io("http://localhost:3000/");
+  private socket = io(`http://${window.location.hostname}:3000/`); //use whatever ip the server is running on
   private drawingActionSubject = new Subject<void>(); //subject to notify when a new drawing action is received
   @Output() newDrawingEvent = new EventEmitter<DrawingAction>();
   private latestDrawingAction: DrawingAction | null = null; //to keep track of the latest drawing action

@@ -6,10 +6,11 @@ const redis = require('redis');
 const DEFAULT_EXPIRATION = 60 * 60 * 24;//1d in s
 
 const redisClient = redis.createClient({ //createClient to connect to redis
-    socket: {
-        host: 'localhost',
-        port: 6379
-    }
+    // socket: { //for localhost connection, in development only
+    //     host: 'localhost',
+    //     port: 6379
+    // }
+    url: process.env.REDIS_URL || 'redis://default:default@localhost:6379'
 });
 //debugging redis connection for when connect or error
 redisClient.on('error', (err) => {
@@ -147,6 +148,6 @@ io.on('connection', (socket) => {
     })
 });
 
-server.listen(3000, () => {
+server.listen(3000, "0.0.0.0", () => { //add that thing so its not just localhost
     console.log('listening on *:3000');
 });

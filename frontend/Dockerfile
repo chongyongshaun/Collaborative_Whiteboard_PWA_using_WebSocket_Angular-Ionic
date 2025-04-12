@@ -12,7 +12,7 @@ COPY frontend/whiteboard_app/ .
 RUN npm run build --prod
 
 # Serve
-FROM nginx:alpine
+FROM nginx
 COPY --from=build /app/www /usr/share/nginx/html
 COPY frontend/whiteboard_app/nginx.conf /etc/nginx/conf.d/default.conf
 EXPOSE 80
